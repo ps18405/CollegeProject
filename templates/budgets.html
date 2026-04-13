@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Budget Management - Expense Tracker</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body {
+            background: linear-gradient(135deg, #f5f7fb 0%, #e9ecef 100%);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        .navbar {
+            background: linear-gradient(90deg, #4e73df 0%, #224abe 100%);
+            border-radius: 0 0 15px 15px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+
+        .card {
+            border: none;
+            border-radius: 15px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+            transition: transform 0.3s;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+        }
+
+        .btn {
+            border-radius: 10px;
+            font-weight: 600;
+        }
+
+        .budget-card {
+            padding: 25px;
+            border-left: 5px solid #4e73df;
+            margin-bottom: 20px;
+        }
+
+        .budget-progress {
+            margin-top: 15px;
+        }
+
+        .budget-stats {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            font-size: 0.9rem;
+        }
+
+        .budget-spent {
+            font-weight: 700;
+        }
+
+        .progress {
+            height: 10px;
+            border-radius: 10px;
+            background: #e0e0e0;
+        }
+
+        .progress-bar {
+            border-radius: 10px;
+        }
+
+        .alert {
+            border-radius: 10px;
+        }
+    </style>
+</head>
+
+<body>
+
+<!-- NAVBAR -->
+<nav class="navbar navbar-dark px-4">
+    <span class="navbar-brand mb-0 h1"><i class="fas fa-piggy-bank"></i> Budget Management</span>
+    <div>
+        <a href="/" class="btn btn-light btn-sm me-2">
+            <i class="fas fa-home"></i> Dashboard
+        </a>
+        <a href="/logout" class="btn btn-light btn-sm">Logout</a>
+    </div>
+</nav>
+
+<div class="container-fluid mt-4">
+
+    {% if request.args.get('success') %}
+    <div class="alert alert-success alert-dismissible fade show">
+        <i class="fas fa-check-circle"></i> Operation successful!
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+    {% endif %}
+
+    {% if request.args.get('error') %}
+    <div class="alert alert-danger alert-dismissible fade show">
+        <i class="fas fa-exclamation-circle"></i> {{ request.args.get('error') }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+    {% endif %}
+
+    <!-- ADD BUDGET FORM -->
+    <div class="card p-4 mb-4">
+        <h5 class="mb-3"><i class="fas fa-plus-circle"></i> Create New Budget</h5>
+        <form method="POST" action="/add_budget">
+            <div class="row g-2">
+                <div class="col-md-3">
+                    <label class="form-label">Category</label>
+                    <select class="form-select" name="category" required>
+                        <option value="">Select category...</option>
+                        {% for cat in categories %}
+                        <option value="{{ cat }}">{{ cat }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Budget Amount</label>
+                    <input type="number" class="form-control" name="budget_amount" placeholder="Enter amount" 
+                           step="0.01" required>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Period</label>
+                    <select class="form-select" name="period" required>
+                        <option value="Monthly">Monthly</option>
+                        <option value="Weekly">Weekly</option>
+                        <option value="Yearly">Yearly</option>
+                    </select>
+                </div>
+                <div class="col-md-4 d-flex align-items-end">
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="fas fa-plus"></i> Add Budget
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    <!-- BUDGETS LIST -->
+    <div class="card p-4">
+        <h5 class="mb-4"><i class="fas fa-list"></i> Active Budgets</h5>
+
+        {% if budgets|length > 0 %}
+            {% for budget in budgets %}
+            <div class="budget-card">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="mb-2"><i class="fas fa-tag"></i> {{ budget['category'] }}</h6>
+                        <small class="text-muted">{{ budget['period'] }} Budget</small>
+                    </div>
+                    <a href="/delete_budget/{{ budget['id'] }}" class="btn btn-sm btn-danger" 
+                       onclick="return confirm('Delete this budget?')">
+                        <i class="fas fa-trash"></i> Delete
+                    </a>
+                </div>
+
+                <div class="budget-progress">
+                    <div class="budget-stats">
+                        <span>Budget: <strong>₹{{ "{:,.2f}".format(budget['budget_amount']) }}</strong></span>
+                        <span class="budget-spent">Spent: ₹{{ "{:,.2f}".format(budget['spent'] or 0) }}</span>
+                        <span>
+                            {% set percent = ((budget['spent'] or 0) / budget['budget_amount'] * 100)|int %}
+                            <strong class="{% if percent > 100 %}text-danger{% elif percent > 75 %}text-warning{% else %}text-success{% endif %}">
+                                {{ percent }}%
+                            </strong>
+                        </span>
+                    </div>
+                    <div class="progress">
+                        {% set percent = ((budget['spent'] or 0) / budget['budget_amount'] * 100)|int %}
+                        {% set barColor = 'bg-danger' if percent > 100 else 'bg-warning' if percent > 75 else 'bg-success' %}
+                        <div class="progress-bar {{ barColor }}" role="progressbar" 
+                             style="width: {{ [percent, 100]|min }}%"></div>
+                    </div>
+                </div>
+
+                {% if budget['spent'] and budget['spent'] > budget['budget_amount'] %}
+                <div class="mt-2">
+                    <small class="text-danger">
+                        <i class="fas fa-exclamation-triangle"></i> 
+                        Over budget by ₹{{ "{:,.2f}".format(budget['spent'] - budget['budget_amount']) }}
+                    </small>
+                </div>
+                {% endif %}
+            </div>
+            {% endfor %}
+        {% else %}
+        <div class="text-center py-5">
+            <i class="fas fa-inbox" style="font-size: 3rem; opacity: 0.5;"></i>
+            <p class="mt-3 text-muted">No budgets created yet. Set your first budget above!</p>
+        </div>
+        {% endif %}
+    </div>
+
+</div>
+
+<div class="container-fluid mt-4 mb-4">
+    <small class="text-muted">
+        <i class="fas fa-info-circle"></i> 
+        Budgets help you monitor and control your spending. Set realistic limits and track your progress!
+    </small>
+</div>
+
+</body>
+</html>
